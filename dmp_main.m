@@ -34,6 +34,11 @@ anglesIm = zeros(size(angles));
 N_dmp = 10;      % number of dmps, number of curves to be imitated 
 N_bf = 100;     % number of basic activation function
 weights = zeros(N_dmp,N_bf);
+ay = 25;    % ay & by: constants of the second order system
+by = ay/4;
+ax = 1;
+tau = 10;
+
 for i = 1:size(angles,1)
     y = angles(i,:);
     y0 = y(1); yg = y(end);
@@ -60,8 +65,6 @@ for i = 1:size(angles,1)
     dy(end) = [];
     
     % Canonical system
-    ax = 1;
-    tau = 10;
     x = exp(-ax/tau*t);
     
     % Generating basic functions
@@ -78,8 +81,7 @@ for i = 1:size(angles,1)
     end    
     
     % Weights
-    ay = 25;    % ay & by: constants of the second order system
-    by = ay/4;
+
     fT = ddy-ay*(by*(yg-y)-dy);     % f_target
 
     w = zeros(1,N_bf);  % weights in the forcing term
@@ -113,116 +115,126 @@ for i = 1:size(angles,1)
     
     anglesIm(i,:) = yIm;
 end
+
+save('D:\Students\Zichong\dmp\weights','weights')
+run('Nao_parameter')
+sim('dmptest.slx')
+
 %% Plotting
-figure(1)
-fs = 12;
+figure(1);
+fs = 18;
+fslegend = 20;
+lw = 2;
 subplot(5,2,1)
-plot(t,angles(1,:),'r','LineWidth',1.5)
+plot(t,angles(1,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(1,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(1,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l1 = legend('Desired trajectory','Trajectory through imitation','Location','SouthWest');
+
 title('Left hip pitch angle')
 set(gca,'fontsize',fs)
-% set(l1,'fontsize',6)
+% set(l1,'fontsize',fslegend)
 subplot(5,2,2)
-plot(t,angles(2,:),'r','LineWidth',1.5)
+plot(t,angles(2,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(2,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(2,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','SouthEast');
 title('Right hip pitch angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,3)
-plot(t,angles(3,:),'r','LineWidth',1.5)
+plot(t,angles(3,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(3,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(3,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','SouthEast');
 title('Left knee bending angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,4)
-plot(t,angles(4,:),'r','LineWidth',1.5)
+plot(t,angles(4,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(4,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(4,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','SouthEast');
 title('Right knee bending angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,5)
-plot(t,angles(5,:),'r','LineWidth',1.5)
+plot(t,angles(5,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(5,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(5,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','NorthEast');
 title('Left ankle pitch angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,6)
-plot(t,angles(6,:),'r','LineWidth',1.5)
+plot(t,angles(6,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(6,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(6,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','NorthEast');
 title('Right ankle pitch angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,7)
-plot(t,angles(7,:),'r','LineWidth',1.5)
+plot(t,angles(7,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(7,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(7,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','SouthEast');
 title('Left hip roll angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,8)
-plot(t,angles(8,:),'r','LineWidth',1.5)
+plot(t,angles(8,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(8,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(8,:),'b--','LineWidth',lw)
 grid on
-xlabel('time[s]')
+% xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','SouthEast');
 title('Right hip roll angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,9)
-plot(t,angles(9,:),'r','LineWidth',1.5)
+plot(t,angles(9,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(9,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(9,:),'b--','LineWidth',lw)
 grid on
 xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','NorthEast');
 title('Left ankle roll angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
 subplot(5,2,10)
-plot(t,angles(10,:),'r','LineWidth',1.5)
+plot(t,angles(10,:),'r','LineWidth',lw)
 hold on
-plot(t,anglesIm(10,:),'b--','LineWidth',1.5)
+plot(t,anglesIm(10,:),'b--','LineWidth',lw)
 grid on
 xlabel('time[s]')
 ylabel('angle[rad]')
-% l2 = legend('Desired trajectory','Trajectory through imitation','Location','SouthEast');
+% l2 = legend('Desired trajectory','Trajectory by imitation','Location','NorthEast');
 title('Right ankle roll angle')
 set(gca,'fontsize',fs)
-% set(l2,'fontsize',6)
+% set(l2,'fontsize',fslegend)
+
+l1 = legend('Desired trajectory','Trajectory by imitation','Location',[0.5 0.95 0.05 0.05],'Orientation','horizontal');
+set(l1,'fontsize',fslegend)
