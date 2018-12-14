@@ -6,8 +6,8 @@ clear all;
 N_dmp = 10;
 N_dmp1 = 2;
 N_bf = 50;
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\wSideRL.mat');
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\primiSideRL.mat');
+load('wSideRL.mat');
+load('primiSideRL.mat');
 ax = 1;
 tau = 1;
 ay = 25; by = ay/4;
@@ -91,6 +91,7 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
 %     figure(1)
 %     plot(anglesIm(8,:))
     sim('dmpRLtest.slx')    % run simulation and get results
+    posFinal(:,count) = position(end,2:4)';
     %% Evaluation
     
     % Stability
@@ -103,30 +104,30 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         end
     end
     if fall == 1
-        reFall = 0;
+        reFall = -100;
     else
-        reFall = 100;
+        reFall = 0;
     end
     
     % Whether still forward or backward offset
     if abs((position(end,2)-position(1,2))) < 0.05
-        reOff = 100;
+        reOff = 0;
     else
-        reOff = -1000;
+        reOff = -exp(10*position(end,2));
     end
     
     % Whether angle is beyond limit
     for i = 1:10
         switch i
             case 1
-                if (min(anglesIm(i,:)) <= deg2rad(-40) || max(anglesIm(i,:)) >= deg2rad(15))
+                if (min(anglesIm(i,:)) <= deg2rad(-10) || max(anglesIm(i,:)) >= deg2rad(15))
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 2
-                if (min(anglesIm(i,:)) <= rad2deg(-40) || max(anglesIm(i,:)) >= rad2deg(15))
+                if (min(anglesIm(i,:)) <= rad2deg(-10) || max(anglesIm(i,:)) >= rad2deg(15))
                     angBeyond = 1;
                     break;
                 else
@@ -171,16 +172,16 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         end
     end
     if angBeyond == 1
-        reAng = -1000;
+        reAng = -10;
     else
-        reAng = 100;
+        reAng = 0;
     end
     % Speed
 %     reSpeed = abs((position(1,3)-position(end,3)))*(100);
-    if (position(1,3)-position(end,3)) > 25
-        reSpeed = 100;
+    if (position(1,3)-position(end,3)) > 0.3
+        reSpeed = 0;%100;
     else 
-        reSpeed = -1000;
+        reSpeed = -exp(10*(position(1,3)-position(end,3)));
     end
     % Direction
     if position(end,3) > position(1,3)
@@ -262,6 +263,6 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
     count = count+1;
     
     
+    
 end
-
 
