@@ -1,0 +1,571 @@
+\section{Walking with Primitives}
+\label{walkingwithprimitives}
+In this section, human is first of all acting as a teacher with the movements of his skeletal points during walking being recorded by a depth camera, the Kinect sensor. After the process of motion mapping, primitives for robots are extracted from these recorded sequences. The best model from Section {\ref{simprework}}, Walk2014, is selected as the model to execute these movement primitives. In this way， the robot is able to walk naturally like the human beings do. Primitives are also improved by reinforcement learning methods
+\subsection{Acquisition of Human Motion}
+In this part, human is acting as a teacher by its locomotion being detected and filmed using the Kinect sensor and the skeletal structure being extracted and plotted in MATLAB. A shared memory is established using Boost C++ Libraries for the purpose of exchanging data between C++, who drives the Kinect sensor, and MATLAB, in which the recorded data is demonstrated. The software realizing such functions is developed in \cite{Ga17a} aiming at detecting arm and hand motion of a human in a table tennis game against the robotic arm. With the Kinect, 25 skeletal joints on the human body are detectable.
+
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[width=8cm]{fig/kinectskeletal.eps}
+%	\caption{Human skeletal structure plot in MATLAB}
+%	\label{kinectskeletal}
+%\end{figure}
+
+
+\begin{figure}[H]
+	\centering
+	\subfloat[25 joints detectable with the Kinect \cite{joint25} \label{joint25}]{%
+	\includegraphics[height=0.3\linewidth]{fig/joint25.png}}
+	\qquad      
+	\subfloat[MATLAB plot of skeletal joints \label{kinectskeletal}]{%
+	\includegraphics[height=0.35\linewidth]{fig/kinectskeletal.eps}}
+	\caption{Human skeletal joints and the corresponding MATLAB plot}
+\end{figure} 
+
+
+\subsubsection{The Kinect Sensor}
+The Kinect is a motion sensing device developed by Microsoft originally for somatic games in which players are able to interact with the virtual gaming environment with their bodies in a natural way. Being equipped with powerful depth sensing technique, the Kinect is nowadays often used in the field of computer vision, such as human skeleton and facial expression tracking \cite{zhang2012microsoft} or hand gesture analysis \cite{han2013enhanced}.
+ 
+\begin{figure}[H]
+	\centering
+	\includegraphics[height=3cm]{fig/kinectcoordinate.png}
+	\caption[The Kinect sensor and its coordinate system]{The Kinect sensor and its coordinate system\cite{kinectcoordinate}}
+	\label{kinect}
+\end{figure}
+
+The Kinect, shown in Figure {\ref{kinect}}, has its own coordinate system, which is different from which is defined on the NAO robot, as well as on the multibody system. The coordinates of joints in Figure {\ref{kinectskeletal}} coincide with the coordinate system of the Kinect. During the experiments of recording human motions, the experimenter faces towards the Kinect (Walking in other directions, e.g. parallel to the Kinect frontage, can cause joint overlapping and confusion.) and therefore corresponding coordinate transformation has to be performed:
+\begin{align*}
+\begin{split}
+	X_{\mathit{Robot}} & \gets Z_{\mathit{Kinect}},\\
+	Y_{\mathit{Robot}} & \gets X_{\mathit{Kinect}},\\
+	Z_{\mathit{Robot}} & \gets Y_{\mathit{Kinect}}.\\
+\end{split}
+\end{align*}
+
+
+
+\subsubsection{Filling Missing Frames}
+In the process of recording joint coordinates using Kinect, it is unavoidable to sometimes have missing frames in data sequences, which are denoted with ''Inf'' in MATLAB. When the number of unrecorded frames is large, that data sequence are discarded and a new experiment should be carried out. On the contrary, when only few of the frames are missing randomly (The missing frame does not depend on the its value or the time point it emerges.), such frames are able to be filled by  an interpolation method presented in \cite{garcia2010robust} and implemented in \cite{inpaintgarcia}.
+
+\subsection{Motion Mapping}
+\label{motionmapping}
+When the 3D point sequences of the human joints are ready, the problem that how to map the motion to the NAO robot is considered since there are huge differences in not only the scale but also degrees of freedom between these two entities. Two main approaches of realizing motion mapping are introduced in {\cite{koenemann2014real}} and {\cite{almetwally2013real}}. 
+
+\subsubsection{Mapping End Effector Coordinates}
+In {\cite{koenemann2014real}}, a method of motion mapping is presented by first transforming the coordinate of every end effector from human to NAO. A reference pose called T-pose for both human and NAO is introduced, denoted as $ p_{H_{\mathit{ref}}} $ and $ p_{N_{\mathit{ref}}} $ respectively. While moving, the position deviation of a certain end effector on human is computed by:
+\begin{equation}
+\Delta p_{H} = p_{H} - p_{H_{\mathit{ref}}}.
+\end{equation}
+
+And finally the position of the same end effector of the NAO is calculated with:
+\begin{equation}
+p_N = p_{N_{\mathit{ref}}} + \alpha_{\mathit{limb}} \cdot\Delta p_H,
+\end{equation}
+where $ \alpha_{\mathit{limb}} =\frac{L_{R_{\mathit{limb}}}}{L_{H_{\mathit{limb}}}} $ is a ratio between the limb length of the NAO and human. Having the positions of the end effectors, corresponding joint angles can be solved iteratively with the damped least squares method introduced in Section {\ref{ik}}.
+
+\subsubsection{Mapping Joint Angles}
+\label{sectionmappingjointangle}
+In {\cite{almetwally2013real}}, another way of motion mapping is realized by mapping the joint angle sequences from a human onto a NAO robot. They propose two methods dealing with joint angles calculation. 
+
+The first method is implemented by using inverse kinematics introduced in Section {\ref{ik}}. Joint angles on a kinematic chain given by Denavit-Hartenberg parameters can be calculated iteratively. However, this approach is superseded because of its inferior position in complexity and computational time. 
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=3cm]{fig/directionvector.pdf}
+	\caption{Human body sketch: joint positions and direction vectors}
+	\label{humansketch}
+\end{figure}
+
+The second method introduces direction vectors in space between two neighbouring skeletal points on the kinematic chain, as shown in Figure {\ref{humansketch}}. This method is adopted in {\cite{almetwally2013real}} as it provides faster speed since it performs only one step calculation. Starting from the centre of mass, a direction vector is calculated by subtracting the 3D coordinates of two neighbouring skeletal points. For example, the direction vector form knee to ankle is given by:
+\begin{equation*}
+\bm{v}_{\mathit{knee2ankle}}=\begin{bmatrix}
+x_{\mathit{ankle}} - x_{\mathit{knee}}\\
+y_{\mathit{ankle}} - y_{\mathit{knee}}\\
+z_{\mathit{ankle}} - z_{\mathit{knee}}\
+\end{bmatrix}.
+\end{equation*}
+
+An angle $ \theta $ between two direction vectors $ \bm{v}_1 $ and $ \bm{v}_2 $ is then calculated using the Euclidean dot product formula:
+\begin{equation}
+\cos\theta= \frac{\bm{v}_1 \bigcdot \bm{v}_2}{\Vert\bm{v}_1 \Vert \Vert \bm{v}_2 \Vert}.
+\end{equation}
+
+However, utilizing this formula leads to a decision problem on the resulting angles lying in $ \left[0,\pi\right] $. In \cite{almetwally2013real}, the angles are determined with the following algorithm. 
+
+As what can be observed from Figure {\ref{kinectskeletal}}, the 3D coordinates are not in real scale. Therefore, only the method of mapping joint angles described in this section is adopted in this thesis. 
+  
+\begin{algorithm}[H]  
+	\label{angledecide}
+	\caption{Decision Problem of Angles (An example of deciding pitch angle)}
+	\begin{algorithmic}[1]
+		\STATE \text{Choose correspnding components $ x_1 $ and $ x_2 $ from  verctor $ \bm{v}_1 = \begin{bmatrix}
+			x_1\\y_1\\z_1
+			\end{bmatrix} $ and $ \bm{v}_2 = \begin{bmatrix}
+			x_2\\y_2\\z_2
+			\end{bmatrix}$}
+		\IF {\text{$ x_1 - x_2 > 0 $}}
+		\STATE \text{$ \theta \gets -\theta $}
+%		\ELSE 
+%		\STATE \text{$ \theta \gets \theta $}
+		\ENDIF
+		\STATE For roll angle, choose $ y_1 $ and $ y_2 $
+	\end{algorithmic}  
+\end{algorithm}
+
+
+\subsection{Dynamic Movement Primitives}
+\label{dmp}
+\ac{DMPs} was proposed by Stefan Schaal's lab first in \cite{schaal2006dynamic} in 2002 and updated in \cite{ijspeert2013dynamical} in 2013. Their contributions are motivated by the desired to find a way to represent complex motor actions that can be flexibly adjusted without manual parameter tuning or having to worry about the instability \cite{schaal2006dynamic}. Complex movements have been thought to be composed of sets of primitive action blocks executed in sequence or in parallel, and DMPs are a proposed mathematical formalization of these primitives. It is nowadays often used for imitation control of robot arms\cite{kober2010movement, mulling2013learning, kulvicius2012joining}, such as playing table tennis or writing alphabet letters. There are two kinds of DMPs available, discrete and rhythmic, designed for periodic and non-periodic movements respectively. In this thesis, only discrete DMPs technique is used and discussed, because natural human movements are not regraded as being strictly periodic. In this subsection, $ x $, $ y $ and $ z $ are system values instead of directions or coordinates.
+
+
+\subsubsection{Basics}
+The essence of the methodology is to have two dynamical systems with one-way connection where we plan movements in one and another is driven to carry them out. The system being driven is usually chosen as a simple point attractor system. An Attractor, in the theory of mathematics and dynamic systems, is a value towards which a system evolves. In the technique of DMPs, such point attractor systems are usually modelled by a simple spring-damper system with the following representation:
+\begin{equation}
+\label{2ndordersystem}
+\ddot{y}(t)=\alpha_y\left(\beta_y(y_g-y(t))-\dot{y}(t)\right),
+\end{equation}
+where $\tau$ is a time constant and $\alpha_y$ and $\beta_y$ are positive coefficients satisfying:
+\begin{equation}
+\alpha_y=4\cdot\beta_y,
+\end{equation}
+such that the systems is globally stable and critically damped. The system tends to the single goal $y=y_g$ when there are no other external forcing terms. 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/pointattractor.eps}
+	\caption{A second order system with single point attractor $y_g = 1$}
+	\label{pointattractor}
+\end{figure}
+
+Therefore, choosing a forcing term $f(t)$ and adding it to the linear point attractor system in Equation {\ref{2ndordersystem}} will transform it into a nonlinear one. In other words, a system with explicit evolution towards the goal $y=y_g$ is now being driven by the forcing term which can be adjusted to represent arbitrarily complex behaviours:
+\begin{align}
+\label{attractorsystemplusforcing}
+\begin{split}
+\tau\dot{z}(t)&=\alpha_y\left(\beta_y\left(y_g-y(t)\right)-z(t)\right)+f(t),\\
+\tau \dot{y}(t) &= z(t).\\
+\end{split}
+\end{align}
+
+The forcing term $f(t)$ can be chosen hypothetically as normalized combination of $M$ fixed basic functions $\Psi_i(t)$ weighted by adjustable weights $w_i$, which can be obtained by solving an optimization problem. The forcing term has the representation: 
+\begin{equation}
+\label{forcingtermt}
+f(t)=\frac{\sum_{i=1}^{M} w_i\Psi_i(t)}{\sum_{i=1}^{M} \Psi_i(t)}.
+\end{equation}
+
+In \cite{ijspeert2013dynamical}, it is clarified that the model should be an autonomous system without explicit time dependence, since performing movements in different speed is an ability being highly expected. Thus, a canonical system with simple dynamics is introduced in place of time:
+\begin{equation}
+ \label{dmpcanonical}
+ \dot{x}(t)=-\alpha_x \cdot \frac{1}{\tau} \cdot x(t),
+\end{equation}
+where $\alpha_x$ denotes the time constant for the canonical system which starts from some initial states (e.g. $x_0=1$) and decrease exponentially. The temporal scaling factor $ \tau $ allows tracing out a trajectory at different desired speeds. The forcing term is now no longer explicitly time dependent and reformulated by introducing two terms $ x(t) $ and $ (y_g-y_0) $ as:
+\begin{equation}
+\label{forcingtermx}
+f(x)=\frac{\sum_{i=1}^M w_i\Psi_i(x)}{\sum_{i=1}^M \Psi_i(x)}x(y_g-y_0),
+\end{equation}
+where the basic function $\Psi_i(x)$ is Gaussian with mean value $c_i$ and variance $h_i$:
+\begin{equation}
+\Psi_i(x)=e^{-h_i(x-c_i)^2}.
+\end{equation}
+The centres of the basic functions are determined in such a way that they are spaced out evenly through time and exponentially over $ \left(0,1\right] $. Moreover, the variances are selected by trial and error so that the basic functions that are activated later will last for longer time.
+
+As the canonical system converges to zero over time, the introduction of $x(t)$ guarantees the stability of the forced point attractor system. On one hand, if the forcing term dies out fast, the forced system will eventually reach the point attractor of the unforced one; on the other hand, if the forcing term diminishes slowly, it will be active within the whole time horizon and drives the system to the desired goal.
+
+%The spatial scaling $ (y_g-y_0) $ in the forcing term provides the ability to react to changes in movement amplitudes. This property will be discussed at the end of next subsection after introducing how the forcing term regenerates the desired movement.
+
+\subsubsection{Imitation Learning}
+Knowing that a normal spring-damper system can be driven by a forcing term to imitate a desired movement and such a forcing term is composed of a set of weighted Gaussian functions, one would be curious about how to find these weights. A \ac{LWR} algorithm presented in \cite{schaal2002scalable} is often chosen in imitation learning with \ac{DMPs} as it provides fast one-shot learning process \cite{ijspeert2013dynamical}.
+
+Having a desired discrete-time movement curve described by its position, velocity and acceleration in finite time horizon $ \begin{bmatrix}
+y_{D_k},\,
+\dot{y}_{D_k},\,
+\ddot{y}_{D_k}
+\end{bmatrix}^T$, where $k\in\left[1,\cdots, K\right] $. Equation \ref{2ndordersystem} can be rearranged to calculate a goal forcing term:
+\begin{equation}
+\bm{f}_{G}=\tau^2 \ddot{\bm{y}}_{D}-\alpha_y\left(\beta_y(y_{D_K}-\bm{y}_{D})- \dot{\bm{y}}_{D}\right).
+\end{equation}
+
+As many other optimizations do, LWR finds weights $ w_i $ for each basic function in Equation {\ref{forcingtermx}} such that the locally weighted cost function is minimized:
+\begin{equation}
+J_i=\sum_{k=1}^{K}\Psi_{i_k}\left[f_{G_k}-w_i\left(y_{D_K}-y_{{D}}\right)x_k\right]^2, \quad i = 1, \cdots, M.
+\end{equation}
+The optimized solution comes to:
+\begin{equation}
+w_i=\frac{\bm{s}^T\Gamma_i \bm{f}_G}{\bm{s}^T\Gamma_i \bm{s}},
+\end{equation}
+where
+
+\begin{equation*}
+\bm{s}= \begin{bmatrix}
+x_1\left(y_{D_K}-y_{D_1}\right)\\\vdots\\x_K\left(y_{D_K}-y_{D_1}\right)
+\end{bmatrix},\quad
+\Gamma_i=\begin{bmatrix}
+\Psi_{i_1}&&0\\&\ddots&\\0&&\Psi_{i_K}
+\end{bmatrix},\quad
+\bm{f}_G=\begin{bmatrix}
+f_{G_1}\\\vdots\\f_{G_K}
+\end{bmatrix}.
+\end{equation*}
+The forcing term $ f(x) $ from Equation {\ref{forcingtermx}} is now ready for mimicking a desired movement. Denoting the reproduced curve as a vector with respect to time $ \bm{y}_{R} = \left[y_{R_1},\cdots,y_{R_K}\right] $, and defining the step size the same as the sampling time $ T_s $, the reproducing procedure is realized with explicit Euler method. 
+
+\begin{algorithm}[H]  
+	
+	\caption{Reproducing trajectories}
+	\begin{algorithmic}[1]
+		\STATE \text{Initializing:} $ y_{R_1}=y_{D_1},\,\dot{y}_{R_1}=0,\,\ddot{y}_{R_1}=0 $
+%		\STATE \text{$ \ddot{\hat{y}}_1= \frac{1}{\tau^2}\left(\alpha_y\left(\beta_y(y_{{des}_g}-\hat{y}_1)-\tau \dot{\hat{y}}_1\right)-f(x_1)\right)$}
+%		\STATE  \text{$ \dot{\hat{y}}_1=\ddot{\hat{y}}_{1}\cdot\Delta t $}
+%		\STATE \text{$ {\hat{y}}_1=\dot{\hat{y}}_{1}\cdot\Delta t $}
+		\FOR{\text{$ k =2:K $}}
+		\STATE \text{$ \ddot{y_R}_{k-1}=\frac{1}{\tau^2}\left(\alpha_y\left(\beta_y(y_{D_K}-y_{R_{k-1}})-\tau\dot{y}_{R_{t-1}}\right)-f(x_{k-1})\right) $}
+		\STATE \text{$ \dot{y}_{R_{k}}=\dot{y}_{R_{k-1}}+\ddot{y}_{R_{k-1}}\cdot T_s $}
+		\STATE \text{$ y_{R_k}=y_{R_{k-1}}+\dot{y}_{R_{k-1}}\cdot T_s $}
+		\ENDFOR
+	\end{algorithmic} 
+	\label{DMPreproduce} 
+\end{algorithm}
+
+\subsubsection{Temporal Scaling}
+An autonomous system is expected to be able to perform the learned trajectories with different speed. The temporal scaling term $ \tau $ in Equation {\ref{dmpcanonical}} allows itself to do so. It is normally set to be 1 during the process of learning. The speed of reproducing a learned trajectory coincides with the speed, with which the canonical system attenuates. In other words, to trace out a learned trajectory faster, $ \tau $ is chosen from $ \left(0,1\right] $. On the contrary, $ \tau $ that is larger than 1 results in slow regeneration. An example is shown in Figure {\ref{dmptempscaling1}}.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/dmptempscaling1.eps}
+	\caption{Reproducing and temporal scaling of a sinusoidal curve}
+	\label{dmptempscaling1}
+\end{figure} 
+
+According to Equation {\ref{attractorsystemplusforcing}} and the reproducing process in Algorithm {\ref{DMPreproduce}}, a reproduced trajectory is the sum of the normal second order system and the forcing term. Therefore, as shown in Figure {\ref{dmptempscaling2}}, temporal scaling also includes scaling on these two terms which should be scaled synchronously.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/dmptempscaling2.eps}
+	\caption{Temporal scaling of the second order system and the forcing term of a sinusoidal curve}
+	\label{dmptempscaling2}
+\end{figure} 
+
+\subsubsection{Stability Analysis}
+It has been discussed that the forcing term in Equation {\ref{attractorsystemplusforcing}} will not suffer from instability because of the exponentially decaying canonical system. However, a problem of stability arises when applying numerical methods on differential equations. Step size should be small enough to achieve convergence especially when explicit Euler method is employed. In this part, the stability problem is discussed with the assumption that the forcing term being deactivated.
+
+Generally, a curve can be approximately represented by the truncated Taylor series \cite{gear1978stability}:
+\begin{equation}
+	\label{taylorseries}
+	y_{k+1} = y_{k}+\dot{y}_{k}\cdot T_s + \ddot{y}_{k}\cdot\frac{T_{s}^2}{2}.
+\end{equation}
+Substituting Equation {\ref{attractorsystemplusforcing}} in Equation {\ref{taylorseries}} and in
+\begin{equation}
+	\dot{y}_{k+1}=\dot{y}_{k}+\ddot{y}_{k}\cdot T_s
+\end{equation}
+yields the following equations:
+\begin{align}
+	\begin{split}
+		y_{k+1} &= \left(1-\frac{a_y\cdot b_y\cdot T_{s}^2}{2\tau^2}\right)y_{k}+\left(\Delta t -\frac{a_y\cdot T_{s}^2}{2\tau}\right)\dot{y}_{k},\\
+		\dot{y}_{k+1} &= -\frac{a_y\cdot b_y\cdot T_{s}}{\tau^2}y_{k} + \left(1-\frac{a_y\cdot T_{s}}{\tau}\right)\dot{y}_{k} ,\\
+	\end{split}
+\end{align}
+whose state space representation is:
+\begin{equation}
+	\begin{bmatrix}
+	y_{k+1}\\\dot{y}_{k+1}
+	\end{bmatrix}=\begin{bmatrix}
+	1-\frac{a_y\cdot b_y\cdot T_{s}^2}{2\tau^2}&T_{s} -\frac{a_y\cdot T_{s}^2}{2\tau}\\- \frac{a_y\cdot b_y\cdot T_{s}}{\tau^2}&1-\frac{a_y\cdot T_{s} t}{\tau}\\
+	\end{bmatrix}\begin{bmatrix}
+	y_{k}\\\dot{y}_{k}
+	\end{bmatrix}.
+\end{equation}
+Stability is guaranteed when the eigenvalues of the state matrix are strictly inside the stability region. In this case, the following inequality holds:
+\begin{equation}
+\label{timescalingbound1}
+	\frac{25}{4}\cdot T_{s} < \tau,
+\end{equation}
+which means that the step size, as well as the sampling time, is coupled with the scaling factor. The reproducing processes are not allowed to be arbitrarily scaled in time since there are hardware limitations in real life.
+\subsection{Extracting Movement Primitives}
+\label{extractingprimitive}
+Experiments are carried out by recording different motions using the Kinect sensor. Each single motion is repeated for five times. Mean curves as well as the standard deviation of joint angles are calculated. The joint angles, except for the ankle pitch and roll angle, are calculated using the method mentioned in Section {\ref{motionmapping}}. Due to the Kinect's poor ability of detecting subtle movements at both ankles, the ankle pitch and roll angles are determined with the Equation {\ref{anklejoint}} in order to keep the feet parallel to the ground.
+%\begin{align}
+%\begin{split}
+%a_p &= h_p-k_b,\\
+%a_r &= -h_r.\\
+%\end{split}
+%\end{align} 
+
+The motion of straight walking, sideward walking and kicking are performed and recorded. Joint angles sequences of the complete motions are shown in Appendix {\ref{recordedangle}}. Desired angle movement primitives are picked out from the mean trajectories and learned by imitation learning method with DMPs.
+
+\subsubsection{Straight Walking Steps}
+An experimenter walks straight towards the Kinect with a step size of approximately \SI{25}{cm}, which is controlled by using the predrawed grids on ground. The whole straight walking process, including the waiting stage at the beginning and resting stage in the end, lasts for \SI{12}{\second}.
+
+
+
+%Defining a complete walking cycle as two consecutive steps performed first by the right and then by the left foot, the whole walking process of \SI{12}{\second} is divided into 6 stages begin listed in Table {\ref{walkingstagestable}}. 
+%\begin{table}[H]
+%	\centering
+%	\caption{Explanation of 6 straight walking stages}
+%	\label{walkingstagestable}
+%	\begin{tabular}{lcccc}
+%		\hline
+%		\text{Stage}&&\text{Explanation}&&\text{Time period}\\
+%		\hline
+%		\text{Stage 1}&&\text{Waiting}&&\SI{0.00}{\second} to \SI{2.00}{\second}\\
+%		\hline
+%		\text{Stage 2}&&\text{1\textsuperscript{st} walking cycle}&&\SI{2.00}{\second} to \SI{4.40}{\second}\\
+%		\hline
+%		\text{Stage 3}&&\text{2\textsuperscript{nd} walking cycle}&&\SI{4.40}{\second} to \SI{6.40}{\second}\\
+%		\hline
+%		\text{Stage 4}&&\text{3\textsuperscript{rd} walking cycle}&&\SI{6.40}{\second} to \SI{8.30}{\second}\\
+%		\hline
+%		\text{Stage 5}&&\text{Final step}&&\SI{8.30}{\second} to \SI{10.00}{\second}\\
+%		\hline
+%		\text{Stage 6}&&\text{Resting}&&\SI{10.00}{\second} to \SI{12.00}{\second}\\
+%		\hline
+%	\end{tabular}
+%\end{table}
+
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[height=9cm,width=\linewidth]{fig/recordedangle.eps}
+%	\caption{Joint angles calculated with recorded 3D point sequences}
+%	\label{recordedangle}
+%\end{figure}
+
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[scale=1]{fig/walkingstages.pdf}
+%	\caption{Straight walking process }
+%	\label{walkingstagesfigure}
+%	
+%\end{figure} 
+
+However, not the whole process is utilized. Several movement primitives, including the starting step, final step and straight walking steps \footnote{The experimenter takes the first step with his right foot. As a result, a straight walking cycle mean one step of the left foot and then one of the right foot.} is achieved by being clipped from these time sequence. 
+\begin{table}[H]
+	\centering
+	\caption{Time periods of straight walking primitives}
+	\label{straightprimitive}
+	\begin{tabular}{ccc}
+		\hline
+		\text{Movement primitive}&&\text{Time period}\\
+		\hline
+		\text{Straight walking step: left foot}&&\SI{3.40}{\second} to \SI{4.45}{\second}\\
+		\hline
+		\text{Straight walking step: right foot}&&\SI{4.45}{\second} to \SI{5.55}{\second}\\
+		\hline
+		\text{Starting step}&&\SI{2.20}{\second} to \SI{3.55}{\second}\\
+		\hline
+		\text{Final step}&&\SI{8.5}{\second} to \SI{11.50}{\second}\\
+		\hline
+	\end{tabular}
+\end{table}
+
+The original and learned joint angle sequences of these four primitives and are shown from Figure {\ref{dmpfirststep}} to Figure {\ref{dmpfinalstep}}.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpfirststep.eps}
+	\caption{Movement primitives of a starting step}
+	\label{dmpfirststep}
+\end{figure} 
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpstraightleft.eps}
+	\caption{Movement primitives of a straight walking left step}
+	\label{dmpstraightleft}
+\end{figure} 
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpstraightright.eps}
+	\caption{Movement primitives of a straight walking right step}
+	\label{dmpstraightright}
+\end{figure} 
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpfinalstep.eps}
+	\caption{Movement primitives of a final step}
+	\label{dmpfinalstep}
+\end{figure}
+
+
+
+
+
+\subsubsection{Sideward Walking}
+An experimenter walks sidewards from left to right in a distance of \SI{2.0}{\meter}, with his coronal plane parallel to the Kinect's front surface. The step size is also controlled by the grids on ground. Joint angle sequences of one sideward walking cycle to the right, from \SI{4.15}{\second} to \SI{6.30}{\second}, are chosen, and split as movement primitives of  sideward walking steps performed by the right and left foot respectively. Primitives of sideward walking to the left are generated by symmetrically exchanging left and right roll movements. The original and learned joint angle sequences of sideward walking primitives are shown from Figure {\ref{dmpsideright}} and {\ref{dmpsideleft}}.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpsideright.eps}
+	\caption{Movement primitives of sideward walking right step}
+	\label{dmpsideright}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpsideleft.eps}
+	\caption{Movement primitives of sideward walking left step}
+	\label{dmpsideleft}
+\end{figure}
+
+\subsubsection{Kicking}
+An experimenter performs a kicking motion with left leg at the distance of \SI{2.5}{\meter} away from the Kinect's front surface. Since it is not a repetitive movement like straight and side walking, the whole kicking process is directly treated as a movement primitive instead of being trimmed. The mean angle movements of kicking motion together with those through imitation learning are shown in Figure {\ref{dmpkick}}.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=1.05\linewidth]{fig/dmpkick.eps}
+	\caption{Movement primitives of kicking}
+	\label{dmpkick}
+\end{figure}
+
+ 
+
+%\begin{figure}[H]
+%	\centering
+%	\includegraphics[height=5cm]{fig/walkingstages.pdf}
+%	\caption{Six stages in straight walking}
+%	\label{walkingstagesfigure}
+%\end{figure}
+
+%This discordance is attributed to the noticeable standard deviations around \SI{8.0}{\second} in the plot of left hip pitch angle and left knee bending angle in Figure {\ref{recordedangle}}. Large standard deviation means, in the epilogue of the walking process, the experimenter takes inconsistent step durations compared to the previous two walking cycles.
+
+
+\subsection{Walk2014 with DMPs}
+In this part, the best model from the Section {\ref{simprework}}, Walk2014, is selected to carry out the extracted motion primitives in last subsection.
+Having the primitives of different motions in memory, the simulation process is carried out according to the block diagram shown in Figure {\ref{dmpsimulation}}. 
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale=0.8]{fig/dmpsimulation.pdf}
+	\caption{Process of simulation using DMPs}
+	\label{dmpsimulation}
+\end{figure}
+
+The task on the topmost two layers, circumstance detection and step planning, are not parts of this thesis and relevant researches from object detection to self localization can be found in \cite{hulkspublication}. The simulation begins with the task of primitives selection on the second layer. The learned weights from the imitation learning process are loaded before the corresponding primitive is executed.
+
+
+%\subsubsection{Step Numbers}
+%In simulation, the ball can be placed at arbitrary position on a \SI{5}{\meter} $ \times $ \SI{5}{\meter} playground. By denoting the ball position as $ \begin{bmatrix}
+%x_{\mathit{ball}}&y_{\mathit{ball}}
+%\end{bmatrix} ^T$ and the robot's initial position as $ \begin{bmatrix}
+%x_{\mathit{robot}}&y_{\mathit{robot}}
+%\end{bmatrix} ^T$, the number of straight walking and sideward walking cycles are determined with:
+%
+%\begin{align}
+%	\begin{split}
+%		N_{\mathit{straight}} &= \frac{\left(x_{\mathit{ball}}-x_{\mathit{robot}}\right)-l_{\mathit{start}}}{l_{\mathit{straight}}},\\
+%		N_{\mathit{sideward}} &= \frac{\left(y_{\mathit{ball}}-y_{\mathit{robot}}\right)}{l_{\mathit{sideward}}},\\
+%	\end{split}
+%\end{align}
+%where $ l_{\mathit{start}} $, $ l_{\mathit{straight}} $ and $ l_{\mathit{sideward}} $ are the step sizes of one starting step, one straight walking cycle and one sideward walking cycle. 
+\subsubsection{Temporal Scaling of Primitives}
+Temporal scaling of primitives is realized by adjusting the $ \tau $ parameter in Equation {\ref{dmpcanonical}}. Defining the speed with $ \tau = 1 $ as normal speed, primitives are speeded up with smaller $ \tau $ between 0 and 1. On the contrary, slower primitives are achieved with $ \tau $ larger than 1.
+
+When the sampling time is a constant parameter in the robot system, a theoretical bound of temporal scaling is mentioned in Equation {\ref{timescalingbound1}}. However, there is another bound for physical execution. Performing the primitives too fast will bring instability to the robot. Moreover, in simulation, the multibody system will also have sliding when the primitives are executed fast. This bound is achieved by tuning the temporal scaling factor $ \tau $. 
+
+In simulation, the primitives of the starting step, the final step and the kicking are not scaled in time. The robot only takes faster or slower forward and sideward steps. After tuning, another bound of temporal scaling is found out to be:
+\begin{equation}
+	0.5 \leqslant \tau
+\end{equation}
+
+\subsubsection{Smoothing of Concatenated Primitives}
+A problem that how to achieve a smooth motion trajectory is considered, when a set of movement primitives are being concatenated. Unsmoothed motion, for example with sudden position or angle changes, brings high power consumption to motor actuators, as well as instability to the whole system.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/dmpsmoothing.pdf}
+	\caption{Trajectory smoothing using reproducing procedure in Algorithm {\ref{DMPreproduce}}}
+	\label{dmpsmooth}
+\end{figure}
+
+Figure {\ref{dmpsmooth}} shows the hip pitch angle sequence concatenated with five motion primitives: one starting step, one straight walking cycle with two straight walking steps, one final step, one sideward walking cycle and one kicking. The smoothing method is inspired by the reproducing process in Algorithm {\ref{DMPreproduce}}. From the second primitive on, the initial value of the reproduced trajectory gets the final value of the previous primitive, instead of being initialized with the initial value of itself.
+
+
+
+\subsubsection{Removing Disturbances on Legs}
+The motion primitives are extracted in such a way that the relative foot should tread on ground after the primitive is executed. For example, after a forward step being taken by the right foot, the right foot itself should step on ground. 
+
+With the help of the Walk2014 scheme, which is a measurement-based gait, whether a foot is a supporting foot can be measured by the pressure sensor. When one leg suffers from disturbances and cannot step on ground after the primitive is completed, method of recovering the leg position so that it is able to continuously carry out the next primitive is introduced in this part.
+
+The recovering is realized by taking an action which brings each joint from the current position back to the end position of a primitive since it is already known. The period of this action can also be temporally scaled, depending on how large is the deviation.
+
+\subsubsection{Simulation and Results}
+In simulation, a scenario is presented. The ball is located on in a \SI{5}{\meter} $ \times $ \SI{5}{\meter} playground. The robot plans 10 forward and 20 sideward steps to the right to reach the ball and then to perform a kick. Forces between the foot and the ball is not modelled. The robot is supposed to be able to kick the ball when its final position is less than \SI{3}{\cm} behind the ball. The operability of temporal scaling and disturbance rejection mentioned above are simulated and tested separately. The simulation system is set up in such a way that the robot executes sideward walking after straight walking, when both of them are required. The logic control under a disturbance free condition is shown in Figure {\ref{dmpwalk2014FSM}}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/dmpwalk2014FSM.pdf}
+	\caption{Walk2014 with DMPs: logic control}
+	\label{dmpwalk2014FSM}
+\end{figure}
+
+Temporal scaling of steps are perform on the second and forth step of the right leg. The step duration is scaled by factor $ \tau = 2 $ and $ \tau = 0.6 $ respectively. Joint angle sequences of four cycles are shown in Figure 
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/dmpwalk2014scale.eps}
+	\caption{Walk2014 with DMPs: temporal scaling}
+	\label{dmpwalk2014scale}
+\end{figure}
+
+At around \SI{5.5}{\second}, at which the right foot is going to step on ground, a trapezoidal disturbance is exerted on the right hip pitch angle. The method of removing such a disturbance is to bring the foot back to the given final position of the current primitive in a desired time period. The result of simulation without temporal scaling is shown in Figure {\ref{dmpwalk2014disturbance}}
+
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{fig/disturbancedmpwalk2014.eps}
+	\caption{Walk2014 with DMPs: disturbance on legs and disturbance rejection}
+	\label{dmpwalk2014disturbance}
+\end{figure}
+
+%The whole simulation process is recorded as videos showing how the robot is walking and can be found in \url{https://github.com/luzistove/Masterthesis/tree/master}.
+
+\subsection{Reinforcement Learning of DMPs}
+
+With the movement primitives from human and the imitation learning technique, as well as the Walk2014 scheme, a stable and natural gait is already presented. One would consider the problem that whether such primitives can still be improved with further learning. 
+
+Imitation learning is a kind of supervised learning mechanism without subsequent self-improvement, as a desired curve is provided to be learned. Therefore, additional reinforcement learning is essential
+for both performance-based refinement and continuous adaptation of the presented skill \cite{kober2010imitation}.
+
+Reinforcement learning \cite{sutton2018reinforcement}, is a process that at time step $ t $, according to the environment state $ s_t \in \mathcal{S}$, the learner agent takes action $ A_t \in \mathcal{A(\mathnormal{s})}$ following a policy $ \pi(s) $  and one time step later, it receives a reward $ R_{t+1} \in \mathcal{R}$ from the environment, telling that how good is the action it just made. The reinforcement learning problem is a expectation maximization problem. At a certain state $ s_t $, the expected future reward is expected to be maximized. 
+
+When applying reinforcement learning algorithms on movement primitives, the difficulty is that the state space described by $ \left[x,y\right] $ from Equation {\ref{dmpcanonical}} and {\ref{attractorsystemplusforcing}} is extremely huge. Classical reinforcement learning algorithms which discretize and explore the state space can no longer be adopted \cite{kober2009learning}. 
+
+\subsubsection{The PoWER Algorithm}
+In \cite{kober2009policy,kober2009learning}, a reinforcement learning algorithm named \ac{PoWER} for motor primitives is proposed. Instead of exploring future states stated in the classical reinforcement learning, PoWER performs stochastic exploration on the weights $ w $ in the forcing term mentioned in DMPs.
+
+The exploring process is realized by adding a term which is Gaussian distributed to the weights $ w $:
+
+\begin{align}
+	\begin{split}
+		w^\prime &= w+\phi,\\
+		\phi\left(\mu,\sigma\right)&\sim\mathcal{N}\left(\mu,\sigma^2\right),\\
+	\end{split}
+\end{align}
+
+where $ \mu $ and  $ \sigma $ are the mean and standard deviation. When applying PoWER, $ \mu $ is normally set to be 0, and $ \sigma $ is one of the tuning parameters.
+
+The concept of importance sampler denoted with $ \langle\bigcdot\rangle _W$ is introduced together with PoWER, which allows the agent to learn from good experiences and improve the policy. In the process of reinforcement learning, the agent is rewarded, either cumulatively or at once after a single rollout. Rollouts are stored in descending order about their rewards in the importance sampler with capacity $ M $. When a new rollout with reward $ R $ is completed and $ R $ is greater than the $ i^{\mathrm{th}} $ entry in the importance sampler, but smaller than the $ (i-1)^{\mathrm{th}} $:
+\begin{equation*}
+	{\langle R(i) \rangle}_{W}<R<{\langle R(i-1) \rangle}_{W},
+\end{equation*} 
+the entries with smaller rewards than $ R $ is shifted and that with the smallest is popped out and discarded. The $ i^{\mathrm{th}} $ entry is occupied by this new rollout.
+
+The weights are updated with the following rule until convergence:
+\begin{equation}
+	w_{k+1} = w_k+\frac{\langle\sum_{m=1}^{M}\phi_m\cdot R_m\rangle_{W}}{\langle\sum_{m=1}^{M}R_m\rangle_{W}}
+\end{equation}
+
+The whole reinforcement learning process with PoWER is described in Algorithm {\ref{power}}.
+\begin{algorithm}[H]  
+	
+	\caption{PoWER}
+	\begin{algorithmic}[1]
+		\STATE \text{Initializing: a vector of weights of a primitive $ w $} 
+		\REPEAT 
+		\STATE	\text{Perform rollout using stochastic exploration on weights: $ w_1^\prime = w_1+\phi$}
+		\STATE {\text{Analyse the performance of the rollout by giving reward $ R $}}
+		\STATE {Update by placing the weights and reward at the correct place in the importance sampler}
+		\STATE Update the weights with $ w_{k+1} = w_k+\frac{\langle\sum_{m=1}^{M}\phi_m\cdot R_m\rangle_{W(m)}}{\langle\sum_{m=1}^{M}R_m\rangle_{W(m)}}$
+		\UNTIL $ w_{k+1} \approx w_k$
+	\end{algorithmic} 
+	\label{power} 
+\end{algorithm}
+
+\subsubsection{Rollout Evaluation and Rewards}
