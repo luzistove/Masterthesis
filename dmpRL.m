@@ -1,38 +1,42 @@
 
-clear all;
+% clear all;
 %% RL process
 % Reinforcement learning is a learning process of many rollouts. 1 rollout is 1 time weights update, 1 time DMP reproduction 
 % with DMPs, 1 time simulation and 1 evaluation
 N_dmp = 10;
-N_dmp1 = 2;
+N_dmp1 = 4;
 N_bf = 50;
-load('wSideRL.mat');
-load('primiSideRL.mat');
+load('E:\TUHH master\Master thesis\Code\dmp\primiRL\wStraightRL.mat');
+load('E:\TUHH master\Master thesis\Code\dmp\primiRL\primiStraightRL.mat');
 ax = 1;
 tau = 1;
 ay = 25; by = ay/4;
 dt = 0.01;
-t = 0:0.01:0.01*(size(primiSideRL,2)-1);
+t = 0:0.01:0.01*(size(primiStraightRL,2)-1);
 
-maxIt = 100;   % max number of rollouts. 
+maxIt = 3;   % max number of rollouts. 
 sig = 100;
 mu = 0;
 count = 1;
-cap = 100;   % capacity of the importance sampler
-R = zeros(1,cap);     % Rewards
+cap = 10;   % capacity of the importance sampler
+R = ones(1,cap);     % Rewards
 rollout = zeros(N_bf,cap*N_dmp1);
 explore = zeros(N_bf,cap*N_dmp1);
-tol = 1e-3;
-wSideRLold = zeros(N_dmp1,N_bf);
-%% RL process
-run('Nao_parameter')
-while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold(2,:)) >= tol)%count <= maxIt%3
-    temp = 2*normrnd(mu,sig,[N_dmp1,N_bf]);
-    wSideRL(1:2,:) = wSideRL(1:2,:) + temp;
+tol = 1e-5;
+wStraightRLold = zeros(N_dmp1,N_bf);
 
-    anglesIm = zeros(N_dmp,size(primiSideRL,2));
+p1 = 1; p2 = p1+N_dmp1-1;
+%% RL process
+% wStraightRL = wStraightRL;
+run('Nao_parameter')
+while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
+    temp = normrnd(mu,sig,[N_dmp1,N_bf]);
+    
+    wStraightRL(p1:p2,:) = wStraightRL(p1:p2,:);% + temp;
+
+    anglesIm = zeros(N_dmp,size(primiStraightRL,2));
     for i = 1:N_dmp
-        y = primiSideRL(i,:);
+        y = primiStraightRL(i,:);
         y0 = y(1); yg = y(end);
     
     
@@ -41,7 +45,6 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         if y0 == yg
             yg = yg+0.001;
         end
-    
 
     
         % Canonical system
@@ -53,15 +56,16 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         des_c = linspace(0,max(t),N_bf);    % point in time where to put the activation function
         c = exp(-ax/tau*des_c);             % point in x where to put the activation function
         h = N_bf^1.5*ones(1,N_bf)./c;       % variance of each activation function, trial and error
-
+      
         psi = zeros(N_bf,length(t));
         for j = 1:N_bf
             for k = 1:length(x)
                 psi(j,k) = exp(-h(j)*(x(k)-c(j))^2);
             end
-        end    
-    
-        wpsi = wSideRL(i,:)*psi;
+        end   
+
+        
+        wpsi = wStraightRL(i,:)*psi;
         f = wpsi./(sum(psi)).*x*(yg-y0);
     
         % Reproducing
@@ -91,7 +95,7 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
 %     figure(1)
 %     plot(anglesIm(8,:))
     sim('dmpRLtest.slx')    % run simulation and get results
-    posFinal(:,count) = position(end,2:4)';
+    posEnd(:,count) = position(end,2:4)';
     %% Evaluation
     
     % Stability
@@ -104,44 +108,44 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         end
     end
     if fall == 1
-        reFall = -100;
+        reFall = -10000;
     else
         reFall = 0;
     end
     
     % Whether still forward or backward offset
-    if abs((position(end,2)-position(1,2))) < 0.05
-        reOff = 0;
+    if abs((position(end,2)-position(1,2))) < 0.01
+        reOff = 0;%20000*abs((position(end,2)-position(1,2)));
     else
-        reOff = -exp(10*position(end,2));
+        reOff = -2000*abs((position(end,2)-position(1,2)));
     end
     
     % Whether angle is beyond limit
     for i = 1:10
         switch i
             case 1
-                if (min(anglesIm(i,:)) <= deg2rad(-10) || max(anglesIm(i,:)) >= deg2rad(15))
+                if (min(anglesIm(i,:)) <= deg2rad(-50) || max(anglesIm(i,:)) >= deg2rad(50))
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 2
-                if (min(anglesIm(i,:)) <= rad2deg(-10) || max(anglesIm(i,:)) >= rad2deg(15))
+                if (min(anglesIm(i,:)) <= rad2deg(-50) || max(anglesIm(i,:)) >= rad2deg(50))
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 3
-                if (min(anglesIm(i,:)) <= -0.3 || max(anglesIm(i,:)) > 0)
+                if (min(anglesIm(i,:)) <= -0.6 || max(anglesIm(i,:)) > 0)
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 4
-                if (min(anglesIm(i,:)) <= -0.3 || max(anglesIm(i,:)) > 0)
+                if (min(anglesIm(i,:)) <= -0.6 || max(anglesIm(i,:)) > 0)
                     angBeyond = 1;
                     break;
                 else
@@ -152,14 +156,14 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
             case 6
                 angBeyond = 0;
             case 7
-                if (min(anglesIm(i,:)) < -0.2 || max(anglesIm(i,:)) > 0)
+                if (min(anglesIm(i,:)) < -0.3 || max(anglesIm(i,:)) > 0)
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 8
-                if (min(anglesIm(i,:)) < 0 || max(anglesIm(i,:)) > 0.2)
+                if (min(anglesIm(i,:)) < 0 || max(anglesIm(i,:)) > 0.3)
                     angBeyond = 1;
                     break;
                 else
@@ -172,17 +176,17 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
         end
     end
     if angBeyond == 1
-        reAng = -10;
+        reAng = -1000;
     else
         reAng = 0;
     end
     % Speed
 %     reSpeed = abs((position(1,3)-position(end,3)))*(100);
-    if (position(1,3)-position(end,3)) > 0.3
-        reSpeed = 0;%100;
-    else 
-        reSpeed = -exp(10*(position(1,3)-position(end,3)));
-    end
+%     if (position(1,3)-position(end,3)) > 0.4
+        reSpeed = 100*abs((position(1,2)-position(end,2)));
+%     else 
+%         reSpeed = 0;
+%     end
     % Direction
     if position(end,3) > position(1,3)
         reDirection = 0;
@@ -192,77 +196,86 @@ while (norm(wSideRL(1,:)-wSideRLold(1,:)) >= tol && norm(wSideRL(2,:)-wSideRLold
     
     % simulation end by error
     if stop(end) == 1
-        reEnd = -100;
+        reEnd = -10000;
     else
         reEnd = 0;
     end
     
-    reAll = reFall+reOff+reAng+reEnd;%+reSpeed;%+reDirection;
+    reAll = reFall+reSpeed+reEnd+reAng;%+reOff+reDirection;
     
     if count <= cap
-        R(1,count) = reAll;
-        rollout(:,(count-1)*2+1:(count-1)*2+2) = wSideRL(1:2,:)';
-        explore(:,(count-1)*2+1:(count-1)*2+2) = temp';
-%         for k = 1:count
-%             if k >= 2
-%                 
-%             end
-%         end
-    end
-    
-    for i = 1:cap
-        if reAll > R(1,i)
-            for j = cap:-1:i+1
-                R(1,j) = R(1,j-1);
-                rollout(:,(j-1)*2+1:(j-1)*2+2) = rollout(:,(j-2)*2+1:(j-2)*2+2);
-                explore(:,(j-1)*2+1:(j-1)*2+2) = explore(:,(j-2)*2+1:(j-2)*2+2);
-            end      
-%             R(1,i) = reAll;
-%             rollout(:,i*10+1:i*10+10) = wSideRL';
-        break;
+        R(1,cap-count+1) = reAll;
+%         rollout(:,(count-1)*N_dmp1+1:(count-1)*N_dmp1+N_dmp1) = wStraightRL(p1:p2,:)';
+%         explore(:,(count-1)*N_dmp1+1:(count-1)*N_dmp1+N_dmp1) = temp';
+        rollout(:,(cap-count)*N_dmp1+1:(cap-count)*N_dmp1+N_dmp1) = wStraightRL(p1:p2,:)';
+        explore(:,(cap-count)*N_dmp1+1:(cap-count)*N_dmp1+N_dmp1) = temp';
+    else
+        for i = 1:cap
+            if reAll > R(1,i)
+                for j = cap:-1:i+1
+                    R(1,j) = R(1,j-1);
+                    rollout(:,(j-1)*N_dmp1+1:(j-1)*N_dmp1+N_dmp1) = rollout(:,(j-2)*N_dmp1+1:(j-2)*N_dmp1+N_dmp1);
+                    explore(:,(j-1)*N_dmp1+1:(j-1)*N_dmp1+N_dmp1) = explore(:,(j-2)*N_dmp1+1:(j-2)*N_dmp1+N_dmp1);
+                end      
+    %             R(1,i) = reAll;
+    %             rollout(:,i*10+1:i*10+10) = wStraightRL';
+                break;
 
+            end
         end
+        R(1,i) = reAll;
+        rollout(:,(i-1)*N_dmp1+1:(i-1)*N_dmp1+N_dmp1) = wStraightRL(p1:p2,:)';
+        
     end
-    R(1,i) = reAll;
-    rollout(:,(i-1)*2+1:(i-1)*2+2) = wSideRL(1:2,:)';
-%     maxR = max(R);
-%     for j = 1:cap
-%         if R(1,j) == maxR
-%             break;
-%         else
-% 
-%         end
-%     end
-%         
-%     maxIndex = j;
-%     if reAll >= maxR
-%        for k = cap:-1:maxIndex+1
-%             R(1,k) = R(1,k-1);
-%             rollout(:,k*10+1:k*10+10) = rollout(:,(k-1)*10+1:(k-1)*10+10);
-%        end
-%        R(1,i) = reAll;
-%        rollout(:,i*10+1:i*10+10) = wSideRL'; 
-%     end
     
+
     
     
     num = zeros(N_bf,N_dmp1);
     den = zeros(N_bf,N_dmp1);
     
     for i=1:cap
-%         num = num+((rollout(:,(i-1)*10+1:(i-1)*10+10)-wSideRL').*R(1,i));
-%         den = den+R(1,i);
-        num = num+(explore(:,(i-1)*2+1:(i-1)*2+2).*R(1,i));
-        den = den+R(1,i);
+        num = num+((rollout(:,(i-1)*N_dmp1+1:(i-1)*N_dmp1+N_dmp1)-wStraightRL(p1:p2,:)').*R(1,i));
+        den = den+R(:,i);
+%         num = num+(explore(:,(i-1)*N_dmp1+1:(i-1)*N_dmp1+N_dmp1).*R(1,i));
+%         den = den+R(:,i);
     end
-    % update   
-    wSideRLold = wSideRL(1:2,:);
-    wSideRL(1:2,:) = wSideRL(1:2,:)+(num./(den+1.e-5))';
+    % update 
+    update = (num./(den+1.e-5))';
+    wStraightRLold = wStraightRL(p1:p2,:);
+    wStraightRL(p1:p2,:) = wStraightRL(p1:p2,:)+update;
 %     figure(2)
-%     plot(wSideRL(:,8))
-    count = count+1;
-    
-    
+%     plot(wStraightRL(:,8))
+    count = count+1
+
     
 end
+%% Plotting
+% numbers of iterative and offset in x direction
+% c1 = 171;
+% plot(1:c1,posEnd(1,:),'r','LineWidth',2)
+% grid on
+% xlabel('number of iteration')
+% ylabel('position [m]')
+% axis([1,171,-0.05,0.2])
+% set(gca,'fontsize',20)
 
+% capacity to iteration number
+% cap 10 iteration 171
+% cap 100 iteration 2170
+% cap 50 iteration 861
+
+% plot([10 50 100],[171 861 2170],'r-s','LineWidth',2)
+
+% plot(1:300,posEnd(2,:),'r','LineWidth',2)
+% grid on
+% xlabel('numbers of iteration')
+% ylabel('position [m]')
+% set(gca,'fontsize',20)
+% plot([10 50 100],[171 861 2170],'r-s','LineWidth',2)
+
+% plot(1:219,posEnd(1,:),'r','LineWidth',2)
+% grid on
+% xlabel('numbers of iteration')
+% ylabel('position [m]')
+% set(gca,'fontsize',20)
