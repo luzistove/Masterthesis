@@ -1,5 +1,5 @@
 
-% clear all;
+clear all;
 %% RL process
 % Reinforcement learning is a learning process of many rollouts. 1 rollout is 1 time weights update, 1 time DMP reproduction 
 % with DMPs, 1 time simulation and 1 evaluation
@@ -7,14 +7,14 @@ N_dmp = 10;
 N_dmp1 = 4;
 N_bf = 50;
 load('E:\TUHH master\Master thesis\Code\dmp\primiRL\wStraightRL.mat');
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\primiStraightRL.mat');
+load('E:\TUHH master\Master thesis\Code\dmp\primiRL\primiStrRL.mat');
 ax = 1;
 tau = 1;
 ay = 25; by = ay/4;
 dt = 0.01;
-t = 0:0.01:0.01*(size(primiStraightRL,2)-1);
+t = 0:0.01:0.01*(size(primiStrRL,2)-1);
 
-maxIt = 3;   % max number of rollouts. 
+maxIt = 2;   % max number of rollouts. 
 sig = 100;
 mu = 0;
 count = 1;
@@ -29,14 +29,14 @@ p1 = 1; p2 = p1+N_dmp1-1;
 %% RL process
 % wStraightRL = wStraightRL;
 run('Nao_parameter')
-while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
-    temp = normrnd(mu,sig,[N_dmp1,N_bf]);
+while count <= 1000%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
+    temp = 2*normrnd(mu,sig,[N_dmp1,N_bf]);
     
-    wStraightRL(p1:p2,:) = wStraightRL(p1:p2,:);% + temp;
+    wStraightRL(p1:p2,:) = wStraightRL(p1:p2,:)+ temp;
 
-    anglesIm = zeros(N_dmp,size(primiStraightRL,2));
+    anglesIm = zeros(N_dmp,size(primiStrRL,2));
     for i = 1:N_dmp
-        y = primiStraightRL(i,:);
+        y = primiStrRL(i,:);
         y0 = y(1); yg = y(end);
     
     
@@ -65,19 +65,20 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
         end   
 
         
-        wpsi = wStraightRL(i,:)*psi;
-        f = wpsi./(sum(psi)).*x*(yg-y0);
+        wpsi = wStraightRL*psi;
+        f = wpsi(i,:)./(sum(psi)).*x*(yg-y0);
     
         % Reproducing
         ddyIm = zeros(1,length(t));
         dyIm = zeros(1,length(t));
         yIm = zeros(1,length(t));
         yIm(1) = y0;
-    
+
         for k = 2:length(t)
             ddyIm(k-1) = 1/tau^2*(ay*(by*(yg-yIm(k-1))-tau*dyIm(k-1))+f(k-1));
             dyIm(k) = dyIm(k-1)+ddyIm(k-1)*dt;
             yIm(k) = yIm(k-1)+dyIm(k-1)*dt;
+
         end
         anglesIm(i,:) = yIm;
         
@@ -92,8 +93,7 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
     hipRollR = anglesIm(8,:);
     ankleRollL = -anglesIm(7,:);
     ankleRollR = -anglesIm(8,:);
-%     figure(1)
-%     plot(anglesIm(8,:))
+    
     sim('dmpRLtest.slx')    % run simulation and get results
     posEnd(:,count) = position(end,2:4)';
     %% Evaluation
@@ -124,14 +124,14 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
     for i = 1:10
         switch i
             case 1
-                if (min(anglesIm(i,:)) <= deg2rad(-50) || max(anglesIm(i,:)) >= deg2rad(50))
+                if (min(anglesIm(i,:)) <= deg2rad(-60) || max(anglesIm(i,:)) >= deg2rad(60))
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 2
-                if (min(anglesIm(i,:)) <= rad2deg(-50) || max(anglesIm(i,:)) >= rad2deg(50))
+                if (min(anglesIm(i,:)) <= rad2deg(-60) || max(anglesIm(i,:)) >= rad2deg(60))
                     angBeyond = 1;
                     break;
                 else
@@ -156,14 +156,14 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
             case 6
                 angBeyond = 0;
             case 7
-                if (min(anglesIm(i,:)) < -0.3 || max(anglesIm(i,:)) > 0)
+                if (min(anglesIm(i,:)) < -0.3 || max(anglesIm(i,:)) > 0.3)
                     angBeyond = 1;
                     break;
                 else
                     angBeyond = 0;
                 end
             case 8
-                if (min(anglesIm(i,:)) < 0 || max(anglesIm(i,:)) > 0.3)
+                if (min(anglesIm(i,:)) < -0.3 || max(anglesIm(i,:)) > 0.3)
                     angBeyond = 1;
                     break;
                 else
@@ -176,14 +176,14 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
         end
     end
     if angBeyond == 1
-        reAng = -1000;
+        reAng = -100;
     else
         reAng = 0;
     end
     % Speed
 %     reSpeed = abs((position(1,3)-position(end,3)))*(100);
 %     if (position(1,3)-position(end,3)) > 0.4
-        reSpeed = 100*abs((position(1,2)-position(end,2)));
+        reSpeed = 100*exp(abs((position(1,2)-position(end,2))));
 %     else 
 %         reSpeed = 0;
 %     end
@@ -229,7 +229,7 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
     end
     
 
-    
+    R
     
     num = zeros(N_bf,N_dmp1);
     den = zeros(N_bf,N_dmp1);
@@ -247,8 +247,8 @@ while count < 2%%3(norm(wStraightRL(p1:p2,:)-wStraightRLold) >= tol )%
 %     figure(2)
 %     plot(wStraightRL(:,8))
     count = count+1
-
-    
+% 
+%     
 end
 %% Plotting
 % numbers of iterative and offset in x direction
@@ -274,7 +274,13 @@ end
 % set(gca,'fontsize',20)
 % plot([10 50 100],[171 861 2170],'r-s','LineWidth',2)
 
-% plot(1:219,posEnd(1,:),'r','LineWidth',2)
+plot(1:219,posEndoff(1,:),'r','LineWidth',2)
+grid on
+xlabel('numbers of iteration')
+ylabel('position [m]')
+axis([0 219 -0.05 0.2])
+set(gca,'fontsize',20)
+% plot(1:300,posEnd(1,:),'r','LineWidth',2)
 % grid on
 % xlabel('numbers of iteration')
 % ylabel('position [m]')
