@@ -1,15 +1,20 @@
 
-% clear all;
+
+clear all;
 %% RL process
 % Reinforcement learning is a learning process of many rollouts. 1 rollout is 1 time weights update, 1 time DMP reproduction 
 % with DMPs, 1 time simulation and 1 evaluation
 N_dmp = 10;
 N_dmp1 = 2;
 N_bf = 50;
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wLeftstepRL.mat');
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wRightstepRL.mat');
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\primiLeftstepRL.mat');
-load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\primiRightstepRL.mat');
+% load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wLeftstepRL.mat');
+% load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wRightstepRL.mat');
+% load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\primiLeftstepRL.mat');
+% load('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\primiRightstepRL.mat');
+load('D:\Students\Zichong\dmp\primiRL\straighttrain\wLeftstepRL.mat');
+load('D:\Students\Zichong\dmp\primiRL\straighttrain\wRightstepRL.mat');
+load('D:\Students\Zichong\dmp\primiRL\straighttrain\primiLeftstepRL.mat');
+load('D:\Students\Zichong\dmp\primiRL\straighttrain\primiRightstepRL.mat');
 ax = 1;
 tau = 1;
 ay = 25; by = ay/4;
@@ -17,7 +22,7 @@ dt = 0.01;
 t = 0:0.01:0.01*(size(primiLeftstep,2)-1);
 %%
 maxIt = 2;   % max number of rollouts. 
-sig = 100;
+sig = 50;
 mu = 0;
 count = 1;
 cap = 10;   % capacity of the importance sampler
@@ -32,13 +37,13 @@ p1 = 7; p2 = p1+N_dmp1-1;
 %% RL process
 % wStraightRL = wStraightRL;
 run('Nao_parameter')
-while count <= 100%(norm(wRightstep(p1:p2,:)-wRightstepold) >= tol )%(norm(wLeftstep(p1:p2,:)-wLeftstepold) >= tol ) &%3
+while (norm(wLeftstep(p1:p2,:)-wLeftstepold) >= tol )%(norm(wRightstep(p1:p2,:)-wRightstepold) >= tol )%count <= 100%(norm(wRightstep(p1:p2,:)-wRightstepold) >= tol )% &%3
     temp = 2*normrnd(mu,sig,[N_dmp1,N_bf]);
     
     wLeftstep(p1:p2,:) = wLeftstep(p1:p2,:)+ temp;
     wRightstep(p1:p2,:) = wRightstep(p1:p2,:)+ temp;
-    save('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wLeftstepRL','wLeftstep');
-    save('E:\TUHH master\Master thesis\Code\dmp\primiRL\straighttrain\wRightstepRL','wRightstep');
+    save('D:\Students\Zichong\dmp\primiRL\straighttrain\wLeftstepRL.mat','wLeftstep');
+%     save('D:\Students\Zichong\dmp\primiRL\straighttrain\wRightstepRL.mat','wRightstep');
 %     anglesIm = zeros(N_dmp,size(primiSideRL,2));
 %     for i = 1:N_dmp
 %         y = primiSideRL(i,:);
@@ -188,7 +193,7 @@ while count <= 100%(norm(wRightstep(p1:p2,:)-wRightstepold) >= tol )%(norm(wLeft
     end
     % Speed
 %     reSpeed = abs((position(1,3)-position(end,3)))*(100);
-    if (position(1,2)-position(end,2)) < 2.5
+    if abs((position(1,2)-position(end,2))) < 2.5
         reSpeed = -1000;%100*exp(abs((position(1,2)-position(end,2))));
     else 
         reSpeed = 0;
@@ -200,14 +205,31 @@ while count <= 100%(norm(wRightstep(p1:p2,:)-wRightstepold) >= tol )%(norm(wLeft
         reDirection = 10;
     end
     
-    % simulation end by error
+    
+    % Oscillation if CoMy
+    for j = 1:size(CoMy,2)
+        if abs(CoMy(2,j)) >= 0.005
+            oscy = 1;
+            break;
+        else
+            oscy = 0;
+        end
+    end
+    if oscy == 1
+        reCoMy = -1000;
+    else
+        reCoMy = 0;
+    end
+    
+    
+    % simulation ends by error
     if stop(end) == 1
         reEnd = -10000;
     else
         reEnd = 0;
     end
     
-    reAll = reFall+reOff+reEnd+reAng+reSpeed;%+reDirection;
+    reAll = reFall+reOff+reEnd+reAng+reSpeed+reCoMy;%+reDirection;
     
     if count <= cap
         R(1,cap-count+1) = reAll;
